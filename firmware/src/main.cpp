@@ -8,33 +8,7 @@
 Adafruit_MPU6050 mpu;
 BleMouse mouse("Mole rat");
 
-// Structure example to receive data
-// Must(Fallout UK) match the sender structure
-typedef struct struct_message {
-    char a[32];
-    int b;
-    float c;
-    bool d;
-} struct_message;
-
-// Create a struct_message called myData
-struct_message myData;
-
-// callback function that will be executed when data is received
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
-  memcpy(&myData, incomingData, sizeof(myData));
-  Serial.print("Bytes received: ");
-  Serial.println(len);
-  Serial.print("Char: ");
-  Serial.println(myData.a);
-  Serial.print("Int: ");
-  Serial.println(myData.b);
-  Serial.print("Float: ");
-  Serial.println(myData.c);
-  Serial.print("Bool: ");
-  Serial.println(myData.d);
-  Serial.println();
-}
+sensors_vec_t initial;
 
 void setup() {
   Serial.begin(115200);
@@ -45,13 +19,17 @@ void setup() {
   
   Serial.println("Adafruit MPU6050 test!");
 
-  // Try to initialize!
-  if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
-    while (1) {
-      delay(10);
+  bool found = false;
+  while (!found) {
+    // Try to initialize!
+    if (mpu.begin()) {
+      found = true;
+    } else {
+      Serial.println("Failed to find MPU6050 chip");
+      delay(1000);
     }
   }
+    
   Serial.println("MPU6050 Found!");
 
   mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
@@ -59,30 +37,56 @@ void setup() {
 
   Serial.println("");
   delay(100);
+
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  initial = a.acceleration;
 }
 
+double vX, vY = 0;
 
-int16_t AccX, AccY, AccZ;
+sensors_vec_t rotateVector(sensors_vec_t base, sensors_vec_t rot) {
+  // Do stuff here
+}
 
 void loop() {
   /* Get new sensor events with the readings */
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
+  sensors_vec_t acc = a.acceleration;
+  for (int i = 0; i <3; i++) {
+    *(acc.v+i) -= *(initial.v+i);
+  }
+
   /* Print out the values */
   Serial.print("Acceleration X: ");
-  Serial.print(a.acceleration.x);
+  Serial.print(acc.x);
   Serial.print(", Y: ");
-  Serial.print(a.acceleration.y);
+  Serial.print(acc.y);
   Serial.print(", Z: ");
-  Serial.print(a.acceleration.z);
+  Serial.print(acc.z);
   Serial.println(" m/s^2");
 
+  Serial.print("Gyro X: ");
+  Serial.print(g.gyro.x);
+  Serial.print(", Y: ");
+  Serial.print(g.gyro.y);
+  Serial.print(", Z: ");
+  Serial.println(g.gyro.z);
+
+  vX += acc.x * .008;
+  vY += acc.y * .008;
+  Serial.print("vX: ");
+  Serial.print(vX);
+  Serial.print(", vY: ");
+  Serial.println(vY);
+
   // double m = (double)millis() / 500.0;
-  delay(500);
+  delay(8);
   // digitalWrite(D1, (byte)(sin(m)* 255.0));
   if(mouse.isConnected()) {
     // mouse.move(cos(m) * 3, sin(m) * -3);
-    mouse.move(a.acceleration.x, a.acceleration.y);
+    mouse.move((byte)vX, (byte)vY);
   }
 }
