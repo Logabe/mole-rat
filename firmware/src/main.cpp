@@ -1,92 +1,126 @@
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <BleMouse.h>
-#include <WiFi.h>
+#include <MPU6050_6Axis_MotionApps612.h>
 #include <Wire.h>
 
-Adafruit_MPU6050 mpu;
+#define CALIBRATE
+#define INTERRUPT_PIN D3
+
+MPU6050 mpu;
 BleMouse mouse("Mole rat");
 
-sensors_vec_t initial;
+/* MPU6050 Stuff */
+bool DMPReady = false; // Flag for loop
+uint8_t MPUIntStatus;
+uint8_t devStatus;
+uint8_t packetSize;
+uint8_t FIFOBuffer[64]; 
+
+Quaternion q; // Quaternion rotation
+VectorInt16 aa; // Acceleration
+VectorInt16 gy; // Gyro
+VectorInt16 aaReal; // Gravity free
+VectorInt16 aaWorld; // World frame
+VectorFloat gravity; // Gravity vector
+float euler[3]; // Euler angles
+
+/* Interrupt */
+volatile bool MPUInterrupt = false;
+void DMPDataReady() {
+  MPUInterrupt = true;
+}
 
 void setup() {
+  Wire.begin();
+  Wire.setClock(400000);
   Serial.begin(115200);
 
   mouse.begin();
-
   pinMode(D1, OUTPUT);
+
+  Serial.println("INITING I2C");
+  mpu.initialize();
+  pinMode(INTERRUPT_PIN, INPUT);  
   
-  Serial.println("Adafruit MPU6050 test!");
+  Serial.println("INITING DMP");
+  devStatus = mpu.dmpInitialize();
+  Serial.println(devStatus);
 
-  bool found = false;
-  while (!found) {
-    // Try to initialize!
-    if (mpu.begin()) {
-      found = true;
-    } else {
-      Serial.println("Failed to find MPU6050 chip");
-      delay(1000);
-    }
-  }
+  mpu.setXGyroOffset(0);
+  mpu.setYGyroOffset(0);
+  mpu.setZGyroOffset(0);
+  mpu.setXAccelOffset(0);
+  mpu.setYAccelOffset(0);
+  mpu.setZAccelOffset(0);
+
+  if (devStatus == 0) {
+    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_4);
+    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
+
+    #ifdef CALIBRATE
+    mpu.CalibrateAccel(10);
+    mpu.CalibrateGyro(10);
+    mpu.PrintActiveOffsets();
+    // Serial.print("Gyro Offset: "); Serial.print(mpu.getXGyroOffset()); Serial.print(", "); Serial.print(mpu.getYGyroOffset()); Serial.print(", "); Serial.println(mpu.getZGyroOffset());
+    // Serial.print("Acc Offset"); Serial.print(mpu.getXAccelOffset()); Serial.print(", "); Serial.print(mpu.getYAccelOffset()); Serial.print(", "); Serial.println(mpu.getZAccelOffset());
+    #endif
     
-  Serial.println("MPU6050 Found!");
 
-  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
-  mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
+    Serial.println("ENABLING DMP");
+    mpu.setDMPEnabled(true);
 
-  Serial.println("");
-  delay(100);
+    Serial.println("ENABLING INT");
+    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), DMPDataReady, RISING);
+    MPUIntStatus = mpu.getIntStatus();
 
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  initial = a.acceleration;
+    Serial.println("DMP Ready");
+    DMPReady = true;
+    packetSize = mpu.dmpGetFIFOPacketSize();
+    Serial.print("Packet size: "); Serial.println(packetSize);
+  } else {
+    Serial.println("DMP INITIALIZATION FAIL");
+  }
 }
 
 double vX, vY = 0;
 
-sensors_vec_t rotateVector(sensors_vec_t base, sensors_vec_t rot) {
-  // Do stuff here
-}
+ulong lastTime = 0;
+
+// sensors_vec_t rotateVector(sensors_vec_t base, sensors_vec_t rot) {
+//   // Do stuff here
+// }
 
 void loop() {
   /* Get new sensor events with the readings */
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
+  if (!DMPReady) return;
 
-  sensors_vec_t acc = a.acceleration;
-  for (int i = 0; i <3; i++) {
-    *(acc.v+i) -= *(initial.v+i);
+  ulong newTime = millis();
+  float deltaTime = (float)(newTime - lastTime) / 1000;
+
+  if (mpu.dmpGetCurrentFIFOPacket(FIFOBuffer)) {
+    mpu.dmpGetQuaternion(&q, FIFOBuffer);
+    mpu.dmpGetEuler(euler, &q);
+    mpu.dmpGetAccel(&aa, FIFOBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+    mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
   }
 
-  /* Print out the values */
-  Serial.print("Acceleration X: ");
-  Serial.print(acc.x);
-  Serial.print(", Y: ");
-  Serial.print(acc.y);
-  Serial.print(", Z: ");
-  Serial.print(acc.z);
-  Serial.println(" m/s^2");
-
-  Serial.print("Gyro X: ");
-  Serial.print(g.gyro.x);
-  Serial.print(", Y: ");
-  Serial.print(g.gyro.y);
-  Serial.print(", Z: ");
-  Serial.println(g.gyro.z);
-
-  vX += acc.x * .008;
-  vY += acc.y * .008;
+  vX = ((float)aaWorld.x / (float)INT16_MAX) * deltaTime * 5000.0;
+  vY = ((float)aaWorld.y / (float)INT16_MAX) * deltaTime * 5000.0;
+  if (vX < 1) vX = 0;
+  if (vY < 1) vY = 0;
+  
   Serial.print("vX: ");
   Serial.print(vX);
   Serial.print(", vY: ");
   Serial.println(vY);
 
   // double m = (double)millis() / 500.0;
-  delay(8);
   // digitalWrite(D1, (byte)(sin(m)* 255.0));
   if(mouse.isConnected()) {
     // mouse.move(cos(m) * 3, sin(m) * -3);
-    mouse.move((byte)vX, (byte)vY);
+    mouse.move((byte)vY, (byte)vX);
   }
+  lastTime = newTime;
 }
