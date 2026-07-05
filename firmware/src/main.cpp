@@ -1,6 +1,7 @@
 #include <MPU6050_6Axis_MotionApps612.h>
 #include <Arduino.h>
 
+#define CALIBRATE
 #define INTERRUPT_PIN D3
 
 MPU6050 mpu;
@@ -58,8 +59,17 @@ void setup() {
   mpu.setZAccelOffset(0);
 
   if (devStatus == 0) {
-    mpu.CalibrateAccel(32);
-    mpu.CalibrateGyro(32);
+    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_4);
+    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
+
+    #ifdef CALIBRATE
+    mpu.CalibrateAccel(60);
+    mpu.CalibrateGyro(60);
+    mpu.PrintActiveOffsets();
+    // Serial.print("Gyro Offset: "); Serial.print(mpu.getXGyroOffset()); Serial.print(", "); Serial.print(mpu.getYGyroOffset()); Serial.print(", "); Serial.println(mpu.getZGyroOffset());
+    // Serial.print("Acc Offset"); Serial.print(mpu.getXAccelOffset()); Serial.print(", "); Serial.print(mpu.getYAccelOffset()); Serial.print(", "); Serial.println(mpu.getZAccelOffset());
+    #endif
+    
 
     Serial.println("ENABLING DMP");
     mpu.setDMPEnabled(true);
@@ -71,6 +81,7 @@ void setup() {
     Serial.println("DMP Ready");
     DMPReady = true;
     packetSize = mpu.dmpGetFIFOPacketSize();
+    Serial.print("Packet size: "); Serial.println(packetSize);
   } else {
     Serial.println("DMP INITIALIZATION FAIL");
   }
@@ -89,7 +100,7 @@ void loop() {
     mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
   }
 
-  Serial.print("Ax:"); Serial.print(aaReal.x); Serial.print(",");
-  Serial.print("Ay:"); Serial.print(aaReal.y); Serial.print(",");
-  Serial.print("Az:"); Serial.print(aaReal.z); Serial.print("\n");
+  Serial.print("Ax:"); Serial.print((double)aaWorld.x / (double)UINT16_MAX); Serial.print(",");
+  Serial.print("Ay:"); Serial.print((double)aaWorld.y / (double)UINT16_MAX); Serial.print(",");
+  Serial.print("Az:"); Serial.print((double)aaWorld.z / (double)UINT16_MAX); Serial.print("\n");
 }
