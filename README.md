@@ -43,7 +43,7 @@ Have you ever had the problem of not having enough space and time to enjoy your 
 
 | Zine |
 | --- |
-| <img alt="Mole-Rat-Zine" src="" /> |
+| <img alt="Mole-Rat-Zine" src="zine/zine.png" /> |
 
 ---
 </details>
