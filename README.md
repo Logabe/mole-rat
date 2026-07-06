@@ -15,7 +15,7 @@ The mole rat is a mouse, controlled by tilting and connected with BLE.
 
 ## Why? 
 
-To save space and time in your hiding spot, while others die, because of inefficiency.
+Have you ever had the problem of not having enough space and time to enjoy your last seconds before the world ends?? Then mole rat is the thing for you. It saves you a total of 5 seconds by not having to lift your hand and move it to the mouse to click a link. It archieves that by being attached to your feet and connected via BLE. 
 
 ---
 
