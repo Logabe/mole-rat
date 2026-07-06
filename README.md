@@ -2,7 +2,7 @@
 
 ## What is this? 
 
-The mole rat is a mouse, controlled by tilting and connected with BLE. 
+Mole rat is a mouse, controlled by tilting and connected with BLE. 
 
 ### Features: 
   - powered by SEED STUDIO XIAO ESP32-C3
