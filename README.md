@@ -34,6 +34,8 @@ Have you ever had the problem of not having enough space and time to enjoy your 
 ---
 
 ## Images
+<img width="4080" height="3060" alt="Foot Mouse" src="https://github.com/user-attachments/assets/b2213771-e9c3-44dc-9ebd-51327d77b680" />
+
 
 ---
 <details>
